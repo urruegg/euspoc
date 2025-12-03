@@ -4,7 +4,7 @@ import { createRoot, Root } from "react-dom/client";
 import { NutritionSportApp } from "./NutritionSportApp";
 import { initializeIcons } from '@fluentui/react/lib/Icons';
 
-export class NutritionSportControl implements ComponentFramework.StandardControl<IInputs, IOutputs> {
+export class NutritionCounsellingControl implements ComponentFramework.StandardControl<IInputs, IOutputs> {
     private _container: HTMLDivElement;
     private _notifyOutputChanged: () => void;
     private _counsellingData: string;

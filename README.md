@@ -73,7 +73,7 @@ This opens a browser test harness where you can interact with the control.
 
 ```
 euspoc/
-├── NutritionSportControl/          # Main control folder
+├── NutritionCounsellingControl/    # Main control folder
 │   ├── index.ts                    # PCF control implementation
 │   ├── NutritionSportApp.tsx       # React component
 │   ├── ControlManifest.Input.xml   # Control manifest
@@ -122,7 +122,7 @@ The control accepts the following property:
 2. Open a Model-Driven App form editor
 3. Select a text field where you want to use the control
 4. In the field properties, choose "Controls" tab
-5. Add the "Nutrition and Sport Control"
+5. Add the "Nutrition Counselling Control"
 6. Configure the Client Name property
 7. Save and publish the form
 
