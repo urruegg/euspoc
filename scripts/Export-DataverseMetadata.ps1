@@ -1,16 +1,26 @@
-# Dataverse Metadata Export Script
-# This script exports metadata for custom tables to document the data model
+# Dataverse Metadata Export Script using Web API
+# Fetches table metadata from Dataverse using the Web API
 
 param(
-    [string]$Environment = "SIT"
+    [Parameter(Mandatory=$false)]
+    [string]$DataverseUrl,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$ClientId,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$ClientSecret,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$TenantId
 )
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "Dataverse Metadata Export Script" -ForegroundColor Cyan
+Write-Host "Dataverse Metadata Export via Web API" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Define tables to export
+# Tables to export
 $tables = @(
     "contact",
     "ur_nutritiondiary",
@@ -19,67 +29,146 @@ $tables = @(
     "ur_nutritioncounseling"
 )
 
-# Get authenticated profile
-Write-Host "Checking PAC CLI authentication..." -ForegroundColor Yellow
-$authList = pac auth list
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Not authenticated. Please run:" -ForegroundColor Red
-    Write-Host "pac auth create --url <DATAVERSE_URL> --applicationId <CLIENT_ID> --clientSecret <SECRET>" -ForegroundColor White
+# Load from environment variables (GitHub Secrets)
+if (-not $DataverseUrl) {
+    $DataverseUrl = $env:DATAVERSE_URL_SIT
+}
+if (-not $ClientId) {
+    $ClientId = $env:DATAVERSE_CLIENT_ID_SIT
+}
+if (-not $ClientSecret) {
+    $ClientSecret = $env:DATAVERSE_CLIENT_SECRET_SIT
+}
+if (-not $TenantId) {
+    $TenantId = $env:DATAVERSE_TENANT_ID_SIT
+}
+
+# Validate required parameters
+$missingSecrets = @()
+if (-not $DataverseUrl) { $missingSecrets += "DATAVERSE_URL_SIT" }
+if (-not $ClientId) { $missingSecrets += "DATAVERSE_CLIENT_ID_SIT" }
+if (-not $ClientSecret) { $missingSecrets += "DATAVERSE_CLIENT_SECRET_SIT" }
+if (-not $TenantId) { $missingSecrets += "DATAVERSE_TENANT_ID_SIT" }
+
+if ($missingSecrets.Count -gt 0) {
+    Write-Host "Missing required GitHub Secrets / Environment Variables:" -ForegroundColor Red
+    foreach ($secret in $missingSecrets) {
+        Write-Host "  - $secret" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "Please set these environment variables:" -ForegroundColor Yellow
+    Write-Host '  $env:DATAVERSE_URL_SIT = "https://ernaehrungundsportdev.crm4.dynamics.com"' -ForegroundColor White
+    Write-Host '  $env:DATAVERSE_CLIENT_ID_SIT = "3d3b3321-c407-4097-b32c-099229918877"' -ForegroundColor White
+    Write-Host '  $env:DATAVERSE_CLIENT_SECRET_SIT = "<your-secret>"' -ForegroundColor White
+    Write-Host '  $env:DATAVERSE_TENANT_ID_SIT = "72f988bf-86f1-41af-91ab-2d7cd011db47"' -ForegroundColor White
     exit 1
 }
 
-Write-Host "Authenticated successfully!" -ForegroundColor Green
+Write-Host "Configuration:" -ForegroundColor Yellow
+Write-Host "  Dataverse URL: $DataverseUrl" -ForegroundColor White
+Write-Host "  Client ID: $ClientId" -ForegroundColor White
+Write-Host "  Tenant ID: $TenantId" -ForegroundColor White
 Write-Host ""
 
-# Create output directory
-$outputDir = ".\dataverse-metadata"
-if (-not (Test-Path $outputDir)) {
-    New-Item -ItemType Directory -Path $outputDir | Out-Null
-    Write-Host "Created output directory: $outputDir" -ForegroundColor Green
-}
-
-# Export metadata for each table
-foreach ($table in $tables) {
-    Write-Host "Exporting metadata for: $table" -ForegroundColor Yellow
+# Function to get OAuth token
+function Get-DataverseToken {
+    param($ClientId, $ClientSecret, $TenantId, $Resource)
     
-    $outputFile = Join-Path $outputDir "$table-metadata.json"
+    Write-Host "Authenticating to Azure AD..." -ForegroundColor Yellow
+    
+    $tokenEndpoint = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token"
+    $scope = "$Resource/.default"
+    
+    $body = @{
+        client_id     = $ClientId
+        scope         = $scope
+        client_secret = $ClientSecret
+        grant_type    = "client_credentials"
+    }
     
     try {
-        # Get table metadata using PAC CLI
-        $metadata = pac entity show --logicalName $table --json 2>&1
-        
-        if ($LASTEXITCODE -eq 0) {
-            $metadata | Out-File -FilePath $outputFile -Encoding UTF8
-            Write-Host "  ✓ Exported to: $outputFile" -ForegroundColor Green
-        } else {
-            Write-Host "  ✗ Failed to export $table" -ForegroundColor Red
-            Write-Host "    Error: $metadata" -ForegroundColor Red
-        }
+        $response = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType "application/x-www-form-urlencoded"
+        Write-Host "  Success - Token acquired" -ForegroundColor Green
+        return $response.access_token
     } catch {
-        Write-Host "  ✗ Error: $_" -ForegroundColor Red
+        Write-Host "  Failed: $_" -ForegroundColor Red
+        Write-Host "  Error details: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Get access token
+$accessToken = Get-DataverseToken -ClientId $ClientId -ClientSecret $ClientSecret -TenantId $TenantId -Resource $DataverseUrl
+
+# Create output directory
+$outputPath = Join-Path $PSScriptRoot ".." "dataverse-metadata"
+if (-not (Test-Path $outputPath)) {
+    New-Item -ItemType Directory -Path $outputPath | Out-Null
+    Write-Host "Created output directory: $outputPath" -ForegroundColor Green
+}
+Write-Host ""
+
+# Headers for API requests
+$headers = @{
+    "Authorization" = "Bearer $accessToken"
+    "Accept" = "application/json"
+    "OData-MaxVersion" = "4.0"
+    "OData-Version" = "4.0"
+    "Content-Type" = "application/json"
+}
+
+# Function to fetch entity metadata
+function Get-EntityMetadata {
+    param($LogicalName, $Headers, $BaseUrl)
+    
+    Write-Host "Fetching metadata for: $LogicalName" -ForegroundColor Yellow
+    
+    $apiUrl = "$BaseUrl/api/data/v9.2/EntityDefinitions(LogicalName='$LogicalName')?`$expand=Attributes,Keys"
+    
+    try {
+        $response = Invoke-RestMethod -Method Get -Uri $apiUrl -Headers $Headers
+        Write-Host "  Success" -ForegroundColor Green
+        return $response
+    } catch {
+        Write-Host "  Failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $null
+    }
+}
+
+# Fetch metadata for each table
+Write-Host "Fetching table metadata..." -ForegroundColor Cyan
+Write-Host ""
+
+foreach ($table in $tables) {
+    $metadata = Get-EntityMetadata -LogicalName $table -Headers $headers -BaseUrl $DataverseUrl
+    
+    if ($metadata) {
+        $outputFile = Join-Path $outputPath "$table.json"
+        $metadata | ConvertTo-Json -Depth 10 | Out-File -FilePath $outputFile -Encoding UTF8
+        Write-Host "  Saved to: $outputFile" -ForegroundColor Gray
     }
     
     Write-Host ""
 }
 
+# Generate markdown documentation
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "Generating Markdown Documentation" -ForegroundColor Cyan
+Write-Host "Generating Documentation" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Generate markdown documentation
-$markdownFile = Join-Path $outputDir "table-documentation.md"
-$markdown = @"
-# Dataverse Tables - Detailed Metadata
-
-Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-
----
-
-"@
+$markdownFile = Join-Path $outputPath "documentation.md"
+$markdown = @()
+$markdown += "# Dataverse Tables - Detailed Metadata"
+$markdown += ""
+$markdown += "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+$markdown += "Environment: $DataverseUrl"
+$markdown += ""
+$markdown += "---"
+$markdown += ""
 
 foreach ($table in $tables) {
-    $jsonFile = Join-Path $outputDir "$table-metadata.json"
+    $jsonFile = Join-Path $outputPath "$table.json"
     
     if (Test-Path $jsonFile) {
         Write-Host "Processing: $table" -ForegroundColor Yellow
@@ -87,51 +176,87 @@ foreach ($table in $tables) {
         try {
             $data = Get-Content $jsonFile -Raw | ConvertFrom-Json
             
-            $markdown += @"
-
-## Table: $($data.LogicalName)
-
-**Display Name**: $($data.DisplayName.UserLocalizedLabel.Label)
-**Schema Name**: $($data.SchemaName)
-**Table Type**: $($data.TableType)
-**Primary Key**: $($data.PrimaryIdAttribute)
-**Primary Name**: $($data.PrimaryNameAttribute)
-
-### Attributes
-
-| Logical Name | Display Name | Type | Required | Description |
-|--------------|--------------|------|----------|-------------|
-
-"@
+            $markdown += "## Table: $($data.LogicalName)"
+            $markdown += ""
             
-            foreach ($attribute in $data.Attributes) {
-                if ($attribute.LogicalName -notmatch "^(createdon|modifiedon|createdby|modifiedby|versionnumber|ownerid|owningbusinessunit|statecode|statuscode)") {
-                    $displayName = if ($attribute.DisplayName.UserLocalizedLabel) { $attribute.DisplayName.UserLocalizedLabel.Label } else { "N/A" }
-                    $description = if ($attribute.Description.UserLocalizedLabel) { $attribute.Description.UserLocalizedLabel.Label } else { "N/A" }
-                    $required = if ($attribute.RequiredLevel.Value -eq "ApplicationRequired" -or $attribute.RequiredLevel.Value -eq "SystemRequired") { "Yes" } else { "No" }
-                    
-                    $markdown += "| ``$($attribute.LogicalName)`` | $displayName | $($attribute.AttributeType) | $required | $description |`n"
-                }
+            if ($data.DisplayName.UserLocalizedLabel) {
+                $markdown += "**Display Name**: $($data.DisplayName.UserLocalizedLabel.Label)"
+            }
+            if ($data.SchemaName) {
+                $markdown += "**Schema Name**: $($data.SchemaName)"
+            }
+            if ($data.EntitySetName) {
+                $markdown += "**Entity Set Name**: $($data.EntitySetName)"
+            }
+            if ($data.PrimaryIdAttribute) {
+                $markdown += "**Primary Key**: $($data.PrimaryIdAttribute)"
+            }
+            if ($data.PrimaryNameAttribute) {
+                $markdown += "**Primary Name**: $($data.PrimaryNameAttribute)"
             }
             
-            $markdown += "`n---`n"
+            $markdown += ""
+            $markdown += "### Key Attributes"
+            $markdown += ""
+            
+            # Filter and display important attributes
+            $importantAttrs = $data.Attributes | Where-Object { 
+                $_.LogicalName -notmatch "^(createdon|modifiedon|createdby|modifiedby|versionnumber|ownerid|owningbusinessunit|statecode|statuscode|importsequencenumber|overriddencreatedon|timezoneruleversionnumber|utcconversiontimezonecode)$"
+            }
+            
+            foreach ($attr in $importantAttrs) {
+                $displayName = if ($attr.DisplayName.UserLocalizedLabel) { $attr.DisplayName.UserLocalizedLabel.Label } else { "N/A" }
+                $description = if ($attr.Description.UserLocalizedLabel) { $attr.Description.UserLocalizedLabel.Label } else { "" }
+                $required = if ($attr.RequiredLevel.Value -match "Required") { "**Required**" } else { "Optional" }
+                $attrType = $attr.AttributeTypeName.Value
+                
+                $markdown += "#### $($attr.LogicalName)"
+                $markdown += "- **Display Name**: $displayName"
+                $markdown += "- **Type**: $attrType"
+                $markdown += "- **Requirement**: $required"
+                if ($description) {
+                    $markdown += "- **Description**: $description"
+                }
+                
+                # Add lookup target if it's a lookup field
+                if ($attr.'@odata.type' -eq '#Microsoft.Dynamics.CRM.LookupAttributeMetadata' -and $attr.Targets) {
+                    $targets = $attr.Targets -join ", "
+                    $markdown += "- **Lookup Target(s)**: $targets"
+                }
+                
+                # Add option set values if it's a picklist
+                if ($attr.'@odata.type' -eq '#Microsoft.Dynamics.CRM.PicklistAttributeMetadata' -and $attr.OptionSet.Options) {
+                    $markdown += "- **Options**:"
+                    foreach ($option in $attr.OptionSet.Options) {
+                        $optionLabel = if ($option.Label.UserLocalizedLabel) { $option.Label.UserLocalizedLabel.Label } else { "N/A" }
+                        $markdown += "  - $($option.Value): $optionLabel"
+                    }
+                }
+                
+                $markdown += ""
+            }
+            
+            $markdown += "---"
+            $markdown += ""
             
         } catch {
-            Write-Host "  ✗ Error processing $table : $_" -ForegroundColor Red
+            Write-Host "  Error processing table: $_" -ForegroundColor Red
         }
     }
 }
 
 $markdown | Out-File -FilePath $markdownFile -Encoding UTF8
-Write-Host "✓ Documentation generated: $markdownFile" -ForegroundColor Green
+Write-Host "Documentation generated: $markdownFile" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host "Export Complete!" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "Output directory: $outputDir" -ForegroundColor White
+Write-Host ""
+Write-Host "Output files:" -ForegroundColor Yellow
+Write-Host "  JSON metadata: $outputPath" -ForegroundColor White
+Write-Host "  Documentation: $markdownFile" -ForegroundColor White
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "1. Review the generated JSON files for detailed metadata" -ForegroundColor White
-Write-Host "2. Check table-documentation.md for formatted documentation" -ForegroundColor White
-Write-Host "3. Update DATAVERSE.md with the relevant information" -ForegroundColor White
+Write-Host "  1. Review the generated documentation" -ForegroundColor White
+Write-Host "  2. Update DATAVERSE.md with accurate field information" -ForegroundColor White

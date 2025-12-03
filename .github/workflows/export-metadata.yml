@@ -1,0 +1,48 @@
+name: Export Dataverse Metadata
+
+on:
+  workflow_dispatch:  # Manual trigger
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM UTC
+
+jobs:
+  export-metadata:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Export Dataverse metadata
+        env:
+          DATAVERSE_URL_SIT: ${{ secrets.DATAVERSE_URL_SIT }}
+          DATAVERSE_CLIENT_ID_SIT: ${{ secrets.DATAVERSE_CLIENT_ID_SIT }}
+          DATAVERSE_CLIENT_SECRET_SIT: ${{ secrets.DATAVERSE_CLIENT_SECRET_SIT }}
+          DATAVERSE_TENANT_ID_SIT: ${{ secrets.DATAVERSE_TENANT_ID_SIT }}
+        run: |
+          .\scripts\Export-DataverseMetadata.ps1
+        shell: pwsh
+        
+      - name: Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code dataverse-metadata/ || echo "changed=true" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+        continue-on-error: true
+        
+      - name: Commit and push metadata
+        if: steps.git-check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dataverse-metadata/
+          git commit -m "chore: update Dataverse metadata [skip ci]"
+          git push
+        shell: pwsh
+        
+      - name: Upload metadata as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dataverse-metadata
+          path: dataverse-metadata/
+          retention-days: 30
