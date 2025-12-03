@@ -73,15 +73,28 @@ This opens a browser test harness where you can interact with the control.
 
 ```
 euspoc/
-├── NutritionCounsellingControl/    # Main control folder
-│   ├── index.ts                    # PCF control implementation
-│   ├── NutritionSportApp.tsx       # React component
-│   ├── ControlManifest.Input.xml   # Control manifest
-│   └── generated/                  # Auto-generated types
+├── src/
+│   └── NutritionCounsellingControl/  # Main control folder
+│       ├── index.ts                  # PCF control implementation
+│       ├── NutritionSportApp.tsx     # React component
+│       ├── ControlManifest.Input.xml # Control manifest
+│       └── generated/                # Auto-generated types
+├── docs/                             # Dataverse table documentation
+│   ├── DATAVERSE_CONTACT_ACTUAL.md
+│   ├── DATAVERSE_NUTRITIONDIARY_ACTUAL.md
+│   ├── DATAVERSE_NUTRITIONLOG_ACTUAL.md
+│   ├── DATAVERSE_SMARTGOAL_ACTUAL.md
+│   └── DATAVERSE_NUTRITIONCOUNSELLING_ACTUAL.md
+├── scripts/                          # PowerShell scripts
+│   ├── Export-DataverseMetadata.ps1
+│   └── Verify-Dataverse-App-User.ps1
+├── dataverse-metadata/               # Exported JSON metadata (gitignored)
 ├── .github/
-│   └── copilot-instructions.md     # GitHub Copilot instructions
-├── package.json                    # Project dependencies
-└── tsconfig.json                   # TypeScript configuration
+│   ├── copilot-instructions.md       # GitHub Copilot instructions
+│   └── workflows/
+│       └── export-metadata.yml       # Metadata export workflow
+├── package.json                      # Project dependencies
+└── tsconfig.json                     # TypeScript configuration
 ```
 
 ## Deployment to Dataverse

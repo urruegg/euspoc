@@ -10,7 +10,11 @@ Power Apps Component Framework (PCF) custom control for Model-Driven Apps
 - **Deployment**: Dataverse environment
 
 ## Project Structure
-- `NutritionCounsellingControl/` - Main control implementation
+- `docs/` - Documentation files (MD)
+- `scripts/` - Deployment and utility scripts
+- `src/` - Source code of 1 or many PCF controls
+- `dataverse-metadata/` - Exported Dataverse metadata JSON files
+- `src/NutritionCounsellingControl/` - First control implementation
   - `index.ts` - PCF control entry point
   - `NutritionSportApp.tsx` - React UI component
   - `ControlManifest.Input.xml` - Control manifest
