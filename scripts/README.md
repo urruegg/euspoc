@@ -1,40 +1,38 @@
 # Dataverse Metadata Export Scripts
 
-This directory contains scripts to extract and document metadata from Dataverse tables.
+This directory contains scripts to extract and document metadata from Dataverse tables using the Web API.
 
 ## Export-DataverseMetadata.ps1
 
-PowerShell script that exports table metadata from Dataverse and generates documentation.
+PowerShell script that exports table metadata from Dataverse using OAuth authentication and the Web API.
 
 ### Prerequisites
 
-- Power Platform CLI (PAC CLI) installed
-- Authenticated to a Dataverse environment
-
-### Authentication
-
-Before running the script, authenticate using one of these methods:
-
-**Using Service Principal (Recommended for CI/CD):**
-```powershell
-pac auth create --url https://ernaehrungundsportdev.crm4.dynamics.com/ `
-  --applicationId 3d3b3321-c407-4097-b32c-099229918877 `
-  --clientSecret <SECRET>
-```
-
-**Using Interactive Login:**
-```powershell
-pac auth create --url https://ernaehrungundsportdev.crm4.dynamics.com/
-```
+Required GitHub Secrets / Environment Variables:
+- `DATAVERSE_URL_SIT` - Dataverse environment URL
+- `DATAVERSE_CLIENT_ID_SIT` - Azure AD App Registration Client ID  
+- `DATAVERSE_CLIENT_SECRET_SIT` - Azure AD App Registration Client Secret
+- `DATAVERSE_TENANT_ID_SIT` - Azure AD Tenant ID
 
 ### Usage
 
-```powershell
-# Run the script
-.\scripts\Export-DataverseMetadata.ps1
+**Via GitHub Actions (Recommended):**
 
-# Or specify environment parameter
-.\scripts\Export-DataverseMetadata.ps1 -Environment "SIT"
+Due to Conditional Access policies, running via GitHub Actions is recommended:
+
+1. Go to https://github.com/urruegg/euspoc/actions
+2. Select "Export Dataverse Metadata" workflow
+3. Click "Run workflow" button
+4. Wait for completion and review the committed metadata files
+
+**Local Execution (may be blocked by Conditional Access):**
+
+```powershell
+$env:DATAVERSE_URL_SIT = "https://ernaehrungundsportdev.crm4.dynamics.com"
+$env:DATAVERSE_CLIENT_ID_SIT = "3d3b3321-c407-4097-b32c-099229918877"
+$env:DATAVERSE_TENANT_ID_SIT = "72f988bf-86f1-41af-91ab-2d7cd011db47"
+$env:DATAVERSE_CLIENT_SECRET_SIT = "<your-secret>"
+.\scripts\Export-DataverseMetadata.ps1
 ```
 
 ### Output
