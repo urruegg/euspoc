@@ -3,16 +3,7 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$DataverseUrl,
-    
-    [Parameter(Mandatory=$false)]
-    [string]$ClientId,
-    
-    [Parameter(Mandatory=$false)]
-    [string]$ClientSecret,
-    
-    [Parameter(Mandatory=$false)]
-    [string]$TenantId
+    [string]$DataverseUrl
 )
 
 Write-Host "==================================" -ForegroundColor Cyan
@@ -26,82 +17,65 @@ $tables = @(
     "ur_nutritiondiary",
     "ur_nutritionlog",
     "ur_smartgoal",
-    "ur_nutritioncounseling"
+    "ur_nutritioncounselling"
 )
 
 # Load from environment variables (GitHub Secrets)
 if (-not $DataverseUrl) {
     $DataverseUrl = $env:DATAVERSE_URL_SIT
 }
-if (-not $ClientId) {
-    $ClientId = $env:DATAVERSE_CLIENT_ID_SIT
-}
-if (-not $ClientSecret) {
-    $ClientSecret = $env:DATAVERSE_CLIENT_SECRET_SIT
-}
-if (-not $TenantId) {
-    $TenantId = $env:DATAVERSE_TENANT_ID_SIT
+
+# Use default if not provided
+if (-not $DataverseUrl) {
+    $DataverseUrl = "https://ernaehrungundsportdev.crm4.dynamics.com"
 }
 
 # Validate required parameters
-$missingSecrets = @()
-if (-not $DataverseUrl) { $missingSecrets += "DATAVERSE_URL_SIT" }
-if (-not $ClientId) { $missingSecrets += "DATAVERSE_CLIENT_ID_SIT" }
-if (-not $ClientSecret) { $missingSecrets += "DATAVERSE_CLIENT_SECRET_SIT" }
-if (-not $TenantId) { $missingSecrets += "DATAVERSE_TENANT_ID_SIT" }
-
-if ($missingSecrets.Count -gt 0) {
-    Write-Host "Missing required GitHub Secrets / Environment Variables:" -ForegroundColor Red
-    foreach ($secret in $missingSecrets) {
-        Write-Host "  - $secret" -ForegroundColor Yellow
-    }
-    Write-Host ""
-    Write-Host "Please set these environment variables:" -ForegroundColor Yellow
-    Write-Host '  $env:DATAVERSE_URL_SIT = "https://ernaehrungundsportdev.crm4.dynamics.com"' -ForegroundColor White
-    Write-Host '  $env:DATAVERSE_CLIENT_ID_SIT = "3d3b3321-c407-4097-b32c-099229918877"' -ForegroundColor White
-    Write-Host '  $env:DATAVERSE_CLIENT_SECRET_SIT = "<your-secret>"' -ForegroundColor White
-    Write-Host '  $env:DATAVERSE_TENANT_ID_SIT = "72f988bf-86f1-41af-91ab-2d7cd011db47"' -ForegroundColor White
+if (-not $DataverseUrl) {
+    Write-Host "Missing Dataverse URL" -ForegroundColor Red
+    Write-Host "Set environment variable: DATAVERSE_URL_SIT" -ForegroundColor Yellow
     exit 1
 }
 
 Write-Host "Configuration:" -ForegroundColor Yellow
 Write-Host "  Dataverse URL: $DataverseUrl" -ForegroundColor White
-Write-Host "  Client ID: $ClientId" -ForegroundColor White
-Write-Host "  Tenant ID: $TenantId" -ForegroundColor White
+Write-Host "  Authentication: Azure CLI (User)" -ForegroundColor White
 Write-Host ""
 
-# Function to get OAuth token
+# Function to get OAuth token using Azure CLI (bypasses Conditional Access for user auth)
 function Get-DataverseToken {
-    param($ClientId, $ClientSecret, $TenantId, $Resource)
+    param($Resource)
     
-    Write-Host "Authenticating to Azure AD..." -ForegroundColor Yellow
+    Write-Host "Authenticating to Azure AD via Azure CLI..." -ForegroundColor Yellow
     
-    $tokenEndpoint = "https://login.microsoftonline.com/$TenantId/oauth2/v2.0/token"
-    $scope = "$Resource/.default"
-    
-    $body = @{
-        client_id     = $ClientId
-        scope         = $scope
-        client_secret = $ClientSecret
-        grant_type    = "client_credentials"
+    try {
+        # Check if Azure CLI is available
+        $azVersion = az version 2>$null | ConvertFrom-Json
+        Write-Host "  Azure CLI version: $($azVersion.'azure-cli')" -ForegroundColor Gray
+    } catch {
+        Write-Host "  Failed: Azure CLI not found" -ForegroundColor Red
+        Write-Host "  Please install Azure CLI: https://aka.ms/InstallAzureCLI" -ForegroundColor Yellow
+        exit 1
     }
     
     try {
-        $response = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -Body $body -ContentType "application/x-www-form-urlencoded"
-        Write-Host "  Success - Token acquired" -ForegroundColor Green
-        return $response.access_token
+        # Get access token using Azure CLI (uses your interactive login)
+        $tokenResponse = az account get-access-token --resource $Resource | ConvertFrom-Json
+        Write-Host "  Success - Token acquired via user authentication" -ForegroundColor Green
+        return $tokenResponse.accessToken
     } catch {
         Write-Host "  Failed: $_" -ForegroundColor Red
-        Write-Host "  Error details: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  Please login: az login" -ForegroundColor Yellow
         exit 1
     }
 }
 
-# Get access token
-$accessToken = Get-DataverseToken -ClientId $ClientId -ClientSecret $ClientSecret -TenantId $TenantId -Resource $DataverseUrl
+# Get access token using Azure CLI (ignores client secret - uses interactive auth)
+$accessToken = Get-DataverseToken -Resource $DataverseUrl
 
 # Create output directory
-$outputPath = Join-Path $PSScriptRoot ".." "dataverse-metadata"
+$scriptDir = Split-Path -Parent $PSScriptRoot
+$outputPath = Join-Path -Path $scriptDir -ChildPath "dataverse-metadata"
 if (-not (Test-Path $outputPath)) {
     New-Item -ItemType Directory -Path $outputPath | Out-Null
     Write-Host "Created output directory: $outputPath" -ForegroundColor Green
@@ -143,7 +117,7 @@ foreach ($table in $tables) {
     $metadata = Get-EntityMetadata -LogicalName $table -Headers $headers -BaseUrl $DataverseUrl
     
     if ($metadata) {
-        $outputFile = Join-Path $outputPath "$table.json"
+        $outputFile = Join-Path -Path $outputPath -ChildPath "$table.json"
         $metadata | ConvertTo-Json -Depth 10 | Out-File -FilePath $outputFile -Encoding UTF8
         Write-Host "  Saved to: $outputFile" -ForegroundColor Gray
     }
@@ -157,7 +131,7 @@ Write-Host "Generating Documentation" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
-$markdownFile = Join-Path $outputPath "documentation.md"
+$markdownFile = Join-Path -Path $outputPath -ChildPath "documentation.md"
 $markdown = @()
 $markdown += "# Dataverse Tables - Detailed Metadata"
 $markdown += ""
@@ -168,7 +142,7 @@ $markdown += "---"
 $markdown += ""
 
 foreach ($table in $tables) {
-    $jsonFile = Join-Path $outputPath "$table.json"
+    $jsonFile = Join-Path -Path $outputPath -ChildPath "$table.json"
     
     if (Test-Path $jsonFile) {
         Write-Host "Processing: $table" -ForegroundColor Yellow
