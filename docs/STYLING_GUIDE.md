@@ -257,6 +257,63 @@ Recommended for migration:
 - ✅ **MoreScreen** - Uses standard option card pattern
 - ✅ **LogMealScreen** - Header and content layout
 - ✅ **LogExerciseScreen** - Header and content layout
+- ✅ **MetabolicInfoCard** - Custom card with demographics and metrics
+- ⚠️ **HomeScreen** - Partial (brand header only)
+- ⚠️ **MealsScreen** - Partial (brand header only)
+- ⚠️ **ProfileScreen** - Partial (brand header only)
+
+## Metabolic Information Card Classes
+
+### Card Container
+`.metabolic-card` - Card with standard padding and layout for metabolic information display.
+
+### Typography
+- `.metabolic-title` - Main card title (20px, 600 weight)
+- `.demographic-label` - Label for demographic/metric fields (12px, muted)
+- `.demographic-value` - Value for demographic/metric fields (14px, 600 weight)
+- `.metric-label` - Label for calculated metrics (12px, muted)
+- `.metric-value` - Value for calculated metrics (14px, 600 weight)
+
+### Layout
+- `.demographics-row` - Horizontal row for demographic items with border
+- `.demographic-item` - Individual demographic field container
+- `.activity-section` - Container for activity level badges
+- `.activity-badges` - Horizontal row of activity badges with wrapping
+- `.metrics-row` - Horizontal row for metric items
+- `.metric-item` - Individual metric field container
+
+### Example Usage
+```tsx
+<Card className="metabolic-card">
+  <Text className="metabolic-title">Metabolic Information</Text>
+  
+  <div className="demographics-row">
+    <div className="demographic-item">
+      <Text className="demographic-label">Height</Text>
+      <Text className="demographic-value">175 cm</Text>
+    </div>
+    <div className="demographic-item">
+      <Text className="demographic-label">Weight</Text>
+      <Text className="demographic-value">78 kg</Text>
+    </div>
+  </div>
+  
+  <div className="metrics-row">
+    <div className="metric-item">
+      <Text className="metric-label">BMR (Basal Metabolic Rate)</Text>
+      <Text className="metric-value">1,650 kcal/day</Text>
+    </div>
+  </div>
+</Card>
+```
+
+## Components That Can Use Common Classes
+
+Recommended for migration:
+- ✅ **LogEntryScreen** - Uses standard option card pattern
+- ✅ **MoreScreen** - Uses standard option card pattern
+- ✅ **LogMealScreen** - Header and content layout
+- ✅ **LogExerciseScreen** - Header and content layout
 - ⚠️ **HomeScreen** - Partial (brand header only)
 - ⚠️ **MealsScreen** - Partial (brand header only)
 - ⚠️ **ProfileScreen** - Partial (brand header only)

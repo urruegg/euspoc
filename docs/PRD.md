@@ -1206,9 +1206,12 @@ The following features are **explicitly excluded** from Use Case 1 and planned f
 **Goal:** Implement P0 functional requirements
 
 **Tasks:**
-- [ ] FR1: Metabolic Information Display
-  - [ ] Fetch contact data from Dataverse
-  - [ ] Create MetabolicInfoCard component
+- [x] FR1: Metabolic Information Display
+  - [x] Create MetabolicInfoCard component (with interactive editing)
+  - [x] Create data fetching script (Get-ContactData-Simple.ps1)
+  - [x] Validate real data structure from production
+  - [ ] Integrate real data into mock
+  - [ ] Fetch contact data from Dataverse (runtime integration)
   - [ ] Handle missing data scenarios
   
 - [ ] FR2: Daily Average Energy Calculation
@@ -1329,7 +1332,9 @@ The following features are **explicitly excluded** from Use Case 1 and planned f
 - [DATAVERSE_NUTRITIONDIARY_ACTUAL.md](./DATAVERSE_NUTRITIONDIARY_ACTUAL.md)
 - [DATAVERSE_NUTRITIONLOG_ACTUAL.md](./DATAVERSE_NUTRITIONLOG_ACTUAL.md)
 - [DATAVERSE_NUTRITIONCOUNSELLING_ACTUAL.md](./DATAVERSE_NUTRITIONCOUNSELLING_ACTUAL.md)
+- [SESSION_2025-12-03.md](./SESSION_2025-12-03.md) - Real data integration session
 - [GitHub Repository](https://github.com/urruegg/euspoc)
+- [Get-ContactData-Simple.ps1](../scripts/Get-ContactData-Simple.ps1) - Data fetching script
 
 ### Appendix B: Mockup Screenshots
 

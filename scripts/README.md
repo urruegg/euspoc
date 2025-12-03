@@ -1,6 +1,60 @@
-# Dataverse Metadata Export Scripts
+# Dataverse Scripts
 
-This directory contains scripts to extract and document metadata from Dataverse tables using the Web API.
+This directory contains scripts for Dataverse metadata export and data retrieval.
+
+## Get-ContactData-Simple.ps1
+
+**NEW** - PowerShell script for fetching real production data from Dataverse.
+
+### Purpose
+Retrieve actual contact and related nutrition data for testing and realistic mock data generation.
+
+### Usage
+
+```powershell
+.\scripts\Get-ContactData-Simple.ps1 -ContactId "1860f1d6-0af2-ef11-be1f-000d3ab2b425"
+```
+
+### Features
+- ✅ Azure CLI authentication (bypasses Conditional Access policies)
+- ✅ Fetches 5 entity types in a single execution
+- ✅ Saves raw JSON responses per entity
+- ✅ Uses correct OData filter syntax for Dataverse Web API
+
+### Entity Types Fetched
+
+1. **Contact** - Demographics (name, birthdate, gender)
+2. **Nutrition Counselling** (`ur_nutritioncounselling`) - BMR, TDEE, weight, activity level
+3. **Nutrition Diary** (`ur_nutritiondiary`) - Food diary entries
+4. **Nutrition Log** (`ur_nutritionlog`) - Nutrition tracking logs
+5. **SMART Goals** (`ur_smartgoal`) - Related goals
+
+### Output Location
+
+`./dataverse-data/` directory:
+- `contact_<ContactId>.json`
+- `nutritioncounselling_<ContactId>.json`
+- `nutritiondiary_<ContactId>.json`
+- `nutritionlog_<ContactId>.json`
+- `smartgoal_<ContactId>.json`
+
+### Latest Execution (Dec 3, 2025)
+
+```
+Contact: Urs Rüegg (58M)
+Weight: 91 kg
+BMR: 2184 kcal
+TDEE: 2839 kcal
+Activity: LightlyActive (315810001)
+
+Records Found:
+- 1 counselling session
+- 1 nutrition diary
+- 8 nutrition logs
+- 0 SMART goals
+```
+
+---
 
 ## Export-DataverseMetadata.ps1
 

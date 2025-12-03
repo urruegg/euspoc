@@ -1,0 +1,13 @@
+﻿{
+    "@odata.context":  "https://ernaehrungundsportdev.crm4.dynamics.com/api/data/v9.2/$metadata#contacts(contactid,firstname,lastname,fullname,emailaddress1,telephone1,mobilephone,birthdate,gendercode)/$entity",
+    "@odata.etag":  "W/\"6846875\"",
+    "fullname":  "Urs Rüegg",
+    "emailaddress1":  "urs.ruegg@teamruegg.com",
+    "contactid":  "1860f1d6-0af2-ef11-be1f-000d3ab2b425",
+    "firstname":  "Urs",
+    "lastname":  "Rüegg",
+    "birthdate":  "1966-10-13",
+    "mobilephone":  "+41 (79) 6001784",
+    "gendercode":  1,
+    "telephone1":  null
+}

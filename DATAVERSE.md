@@ -125,17 +125,20 @@ Custom table for counselling sessions.
 **Display Name**: Nutrition Counseling
 
 **Key Fields:**
-- `ur_nutritioncounselingid` - Primary key (GUID)
+- `ur_nutritioncounsellingid` - Primary key (GUID)
 - `ur_name` - Session name/identifier
-- `ur_sessiondate` - Date of counseling session (DateTime)
-- `ur_contact` - Lookup to Contact (Many-to-One)
+- `_ur_member_value` - Lookup to Contact (Many-to-One) **[Verified Dec 3, 2025]**
+- `ur_biometricweight` - Current weight in kg (Decimal)
+- `ur_basemetabolicrate` - BMR in kcal (Integer)
+- `ur_dailymetabolicrate` - TDEE in kcal (Decimal)
+- `ur_physicalactivity` - Activity level (Choice/OptionSet)
+  - Values: 315810000 (Sedentary), 315810001 (LightlyActive), 315810002 (ModeratelyActive), 315810003 (VeryActive), 315810004 (ExtraActive)
 - `ur_nutritionnotes` - Nutrition counselling notes (Multi-line Text)
 - `ur_exercisenotes` - Exercise counselling notes (Multi-line Text)
 - `ur_sessiongoals` - Goals set during session (Multi-line Text)
-- `ur_nextsessiondate` - Next scheduled session (DateTime)
-- `ur_sessionstatus` - Session status (Option Set)
-  - Values: Scheduled (0), Completed (1), Cancelled (2), No Show (3)
-- `ur_counselor` - Lookup to User (counselor/nutritionist)
+- `ur_counsellingdate` - Date of counseling session (DateTime)
+- `statecode` - Record state (0=Active, 1=Inactive)
+- `statuscode` - Status reason (Integer)
 
 **Purpose**: Core table for counselling session management used by the PCF Control.
 
@@ -263,11 +266,56 @@ Ensure the following security roles have access to custom tables:
 **Issue**: PCF Control not visible in form editor
 - **Solution**: Clear browser cache and republish the form
 
+## Data Fetching Scripts
+
+### Get-ContactData-Simple.ps1
+
+**Purpose**: Fetch real production data from Dataverse for testing and mock data creation.
+
+**Location**: `scripts/Get-ContactData-Simple.ps1`
+
+**Usage**:
+```powershell
+.\scripts\Get-ContactData-Simple.ps1 -ContactId "1860f1d6-0af2-ef11-be1f-000d3ab2b425"
+```
+
+**Features**:
+- Uses Azure CLI authentication (bypasses Conditional Access)
+- Fetches 5 entity types: contact, nutritioncounselling, nutritiondiary, nutritionlog, smartgoals
+- Saves raw JSON responses to `./dataverse-data/` directory
+- Validates correct lookup field names (`_ur_member_value`, `_regardingobjectid_value`)
+
+**Output Files**:
+- `contact_<guid>.json`
+- `nutritioncounselling_<guid>.json`
+- `nutritiondiary_<guid>.json`
+- `nutritionlog_<guid>.json`
+- `smartgoal_<guid>.json`
+
+**Verified Field Mappings** (Dec 3, 2025):
+- Contact lookup in nutrition tables: `_ur_member_value`
+- Contact lookup in SMART goals: `_regardingobjectid_value`
+- All OData filters use these exact field names
+
+**Example Data Retrieved**:
+```json
+{
+  "ur_biometricweight": 91,
+  "ur_basemetabolicrate": 2184,
+  "ur_dailymetabolicrate": 2839.200,
+  "ur_physicalactivity": 315810001,
+  "_ur_member_value": "1860f1d6-0af2-ef11-be1f-000d3ab2b425"
+}
+```
+
+---
+
 ## Additional Resources
 
 - [Power Apps Component Framework Documentation](https://learn.microsoft.com/power-apps/developer/component-framework/)
 - [Dataverse Web API Reference](https://learn.microsoft.com/power-apps/developer/data-platform/webapi/reference)
 - [GitHub Actions for Power Platform](https://github.com/marketplace/actions/powerplatform-actions)
+- [Session Summary - Dec 3, 2025](./docs/SESSION_2025-12-03.md)
 
 ---
 

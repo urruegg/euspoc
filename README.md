@@ -2,6 +2,16 @@
 
 Power Apps Component Framework (PCF) custom control for tracking nutrition and sport counselling sessions in Model-Driven Apps.
 
+## 🎯 Recent Updates (December 3, 2025)
+
+### Real Data Integration
+
+- ✅ Created `Get-ContactData-Simple.ps1` for fetching production data from Dataverse
+- ✅ Successfully retrieved real contact data: Urs Rüegg (58M, 91kg, BMR: 2184, TDEE: 2839)
+- ✅ Fetched related records: 1 counselling session, 1 diary, 8 nutrition logs
+- ✅ All data saved to `dataverse-data/` directory as JSON
+- 🔄 Next: Update mock data with production values for realistic testing
+
 ## Project Overview
 
 This project contains a React-based PCF control built with Fluent UI that visualizes and manages counselling work for nutrition and sport consultations. The control is designed to be deployed to Dataverse environments.
@@ -73,6 +83,15 @@ This opens a browser test harness where you can interact with the control.
 
 ```
 euspoc/
+├── dataverse-data/                   # Real production data (JSON)
+│   ├── contact_*.json
+│   ├── nutritioncounselling_*.json
+│   ├── nutritiondiary_*.json
+│   ├── nutritionlog_*.json
+│   └── smartgoal_*.json
+├── scripts/                          # PowerShell scripts
+│   ├── Get-ContactData-Simple.ps1    # Fetch real data from Dataverse
+│   └── Export-DataverseMetadata.ps1  # Export table metadata
 ├── src/
 │   └── NutritionCounsellingControl/  # Main control folder
 │       ├── index.ts                  # PCF control implementation
