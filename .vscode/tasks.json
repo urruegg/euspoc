@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start PCF Watch",
+			"type": "shell",
+			"command": "npm run start:watch",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
