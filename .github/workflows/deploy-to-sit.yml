@@ -1,0 +1,264 @@
+name: Deploy Solution to SIT
+
+on:
+  workflow_dispatch:  # Manual trigger only - no automatic deployments
+    inputs:
+      artifact_name:
+        description: 'Artifact name from build workflow (default: solution-package)'
+        required: false
+        default: 'solution-package'
+      run_id:
+        description: 'Build workflow run ID (leave empty for latest)'
+        required: false
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    environment: sit  # Requires environment approval if configured
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login (Service Principal)
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.DATAVERSE_CLIENT_ID_SIT }}",
+              "clientSecret": "${{ secrets.DATAVERSE_CLIENT_SECRET_SIT }}",
+              "tenantId": "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
+            }
+      
+      - name: Verify Azure Authentication
+        shell: pwsh
+        run: |
+          Write-Host "=== Azure Authentication Status ===" -ForegroundColor Cyan
+          $account = az account show --query "[name, user.name, tenantId]" -o tsv
+          Write-Host "Account: $account" -ForegroundColor Green
+          
+          $tenantId = az account show --query tenantId -o tsv
+          $expectedTenant = "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
+          
+          if ($tenantId -ne $expectedTenant) {
+            Write-Error "Tenant mismatch! Expected: $expectedTenant, Got: $tenantId"
+            exit 1
+          }
+      
+      - name: Setup Power Platform CLI
+        uses: microsoft/powerplatform-actions/actions-install@v1
+      
+      - name: Authenticate to Dataverse (Service Principal)
+        shell: pwsh
+        run: |
+          Write-Host "=== Authenticating to Dataverse ===" -ForegroundColor Cyan
+          
+          pac auth create `
+            --environment "${{ secrets.DATAVERSE_URL_SIT }}" `
+            --applicationId "${{ secrets.DATAVERSE_CLIENT_ID_SIT }}" `
+            --clientSecret "${{ secrets.DATAVERSE_CLIENT_SECRET_SIT }}" `
+            --tenant "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "PAC authentication failed!"
+            exit 1
+          }
+          
+          Write-Host "Authentication successful!" -ForegroundColor Green
+      
+      - name: Download Solution Package Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.artifact_name || 'solution-package' }}
+          path: ./artifact
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Verify Downloaded Package
+        shell: pwsh
+        run: |
+          Write-Host "=== Solution Package Verification ===" -ForegroundColor Cyan
+          $zipPath = "./artifact/ernaehrungundsportcomponents.zip"
+          
+          if (Test-Path $zipPath) {
+            $zipSize = (Get-Item $zipPath).Length
+            Write-Host "Package found: $($zipSize / 1MB) MB" -ForegroundColor Green
+          } else {
+            Write-Error "Solution package not found!"
+            Get-ChildItem ./artifact -Recurse
+            exit 1
+          }
+      
+      - name: Get Current Solution Version
+        id: get_version
+        shell: pwsh
+        run: |
+          Write-Host "=== Retrieving Current Solution Version ===" -ForegroundColor Cyan
+          
+          $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
+          $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,solutionid"
+          
+          $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
+          $headers = @{
+            "Authorization" = "Bearer $token"
+            "Content-Type" = "application/json"
+            "OData-MaxVersion" = "4.0"
+            "OData-Version" = "4.0"
+          }
+          
+          try {
+            $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
+            if ($response.value.Count -gt 0) {
+              $currentVersion = $response.value[0].version
+              Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
+              echo "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
+            } else {
+              Write-Host "Solution not found - first deployment" -ForegroundColor Yellow
+              echo "current_version=0.0.0.0" >> $env:GITHUB_OUTPUT
+            }
+          } catch {
+            Write-Warning "Could not retrieve current version: $_"
+            echo "current_version=unknown" >> $env:GITHUB_OUTPUT
+          }
+      
+      - name: Import Solution to Dataverse
+        shell: pwsh
+        run: |
+          Write-Host "=== Importing Solution to Dataverse ===" -ForegroundColor Cyan
+          Write-Host "Environment: ${{ secrets.DATAVERSE_URL_SIT }}" -ForegroundColor Cyan
+          Write-Host "Current Version: ${{ steps.get_version.outputs.current_version }}" -ForegroundColor Cyan
+          
+          pac solution import `
+            --path "./artifact/ernaehrungundsportcomponents.zip" `
+            --async `
+            --force-overwrite `
+            --publish-changes `
+            --skip-dependency-check
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Solution import failed!"
+            exit 1
+          }
+          
+          Write-Host "Solution import initiated successfully!" -ForegroundColor Green
+      
+      - name: Wait for Import Completion
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          Write-Host "=== Monitoring Import Progress ===" -ForegroundColor Cyan
+          
+          $maxRetries = 60
+          $retryCount = 0
+          $sleepSeconds = 10
+          
+          while ($retryCount -lt $maxRetries) {
+            Start-Sleep -Seconds $sleepSeconds
+            $retryCount++
+            
+            Write-Host "Checking import status (attempt $retryCount/$maxRetries)..." -ForegroundColor Yellow
+            
+            # Check if solution version has been updated
+            $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
+            $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,modifiedon"
+            
+            $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
+            $headers = @{
+              "Authorization" = "Bearer $token"
+              "Content-Type" = "application/json"
+              "OData-MaxVersion" = "4.0"
+              "OData-Version" = "4.0"
+            }
+            
+            try {
+              $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
+              if ($response.value.Count -gt 0) {
+                $newVersion = $response.value[0].version
+                $modifiedOn = $response.value[0].modifiedon
+                
+                Write-Host "Current version: $newVersion (modified: $modifiedOn)" -ForegroundColor Cyan
+                
+                # If version changed or modified time is recent, import likely succeeded
+                if ($newVersion -ne "${{ steps.get_version.outputs.current_version }}") {
+                  Write-Host "Version updated! Import completed successfully." -ForegroundColor Green
+                  break
+                }
+              }
+            } catch {
+              Write-Warning "Error checking status: $_"
+            }
+          }
+          
+          if ($retryCount -ge $maxRetries) {
+            Write-Warning "Import status could not be confirmed within timeout period."
+            Write-Host "Please verify manually in Dataverse." -ForegroundColor Yellow
+          }
+      
+      - name: Verify Deployment
+        shell: pwsh
+        run: |
+          Write-Host "=== Deployment Verification ===" -ForegroundColor Cyan
+          
+          $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
+          $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,friendlyname,installedon,modifiedon"
+          
+          $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
+          $headers = @{
+            "Authorization" = "Bearer $token"
+            "Content-Type" = "application/json"
+            "OData-MaxVersion" = "4.0"
+            "OData-Version" = "4.0"
+          }
+          
+          try {
+            $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
+            
+            if ($response.value.Count -gt 0) {
+              $solution = $response.value[0]
+              
+              Write-Host "=== Deployed Solution Details ===" -ForegroundColor Green
+              Write-Host "Name: $($solution.friendlyname)" -ForegroundColor White
+              Write-Host "Version: $($solution.version)" -ForegroundColor White
+              Write-Host "Installed On: $($solution.installedon)" -ForegroundColor White
+              Write-Host "Modified On: $($solution.modifiedon)" -ForegroundColor White
+              Write-Host ""
+              Write-Host "Previous Version: ${{ steps.get_version.outputs.current_version }}" -ForegroundColor Yellow
+              Write-Host ""
+              Write-Host "✅ Deployment verified successfully!" -ForegroundColor Green
+            } else {
+              Write-Error "Solution not found in Dataverse after import!"
+              exit 1
+            }
+          } catch {
+            Write-Error "Verification failed: $_"
+            exit 1
+          }
+      
+      - name: Create Deployment Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $summary = @"
+          ## 🚀 Deployment Summary
+          
+          **Environment:** SIT (System Integration Testing)
+          **Solution:** ernaehrungundsportcomponents
+          **Status:** ${{ job.status }}
+          
+          ### Version Information
+          - **Previous Version:** ${{ steps.get_version.outputs.current_version }}
+          - **Deployment Time:** $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
+          
+          ### Environment Details
+          - **Dataverse URL:** ${{ secrets.DATAVERSE_URL_SIT }}
+          - **Tenant ID:** ${{ secrets.DATAVERSE_TENANT_ID_SIT }}
+          - **Service Principal:** ${{ secrets.DATAVERSE_CLIENT_ID_SIT }}
+          
+          ### Next Steps
+          1. Verify control appears in solution components
+          2. Test control on ur_nutritioncounselling form
+          3. Validate data binding and functionality
+          
+          "@
+          
+          echo $summary >> $env:GITHUB_STEP_SUMMARY

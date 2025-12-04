@@ -1,0 +1,106 @@
+name: Build Solution Package
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'solution/**'
+      - 'package.json'
+      - '.github/workflows/build-solution.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install NPM Dependencies
+        run: npm ci
+      
+      - name: Build PCF Control
+        run: npm run build
+      
+      - name: Verify PCF Build Output
+        shell: pwsh
+        run: |
+          Write-Host "=== PCF Control Build Output ===" -ForegroundColor Cyan
+          if (Test-Path "out/controls/NutritionCounsellingControl") {
+            Get-ChildItem "out/controls/NutritionCounsellingControl" -Recurse | ForEach-Object {
+              Write-Host "$($_.FullName) - $($_.Length) bytes"
+            }
+          } else {
+            Write-Error "PCF control output not found!"
+            exit 1
+          }
+      
+      - name: Setup MSBuild (via Visual Studio)
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Restore NuGet Packages
+        working-directory: solution
+        run: msbuild /t:Restore /p:Configuration=Release
+      
+      - name: Build Solution Package
+        working-directory: solution
+        run: msbuild /p:Configuration=Release /p:Platform="Any CPU" /verbosity:detailed
+      
+      - name: Verify Solution Package
+        shell: pwsh
+        working-directory: solution
+        run: |
+          Write-Host "=== Solution Package Contents ===" -ForegroundColor Cyan
+          $zipPath = "bin/Release/ernaehrungundsportcomponents.zip"
+          
+          if (Test-Path $zipPath) {
+            $zipSize = (Get-Item $zipPath).Length
+            Write-Host "Package size: $($zipSize / 1MB) MB" -ForegroundColor Green
+            
+            # Extract and list contents
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zipPath))
+            
+            Write-Host "`nPackage Contents:" -ForegroundColor Cyan
+            $zip.Entries | ForEach-Object {
+              Write-Host "  $($_.FullName) - $($_.Length) bytes"
+            }
+            
+            $zip.Dispose()
+            
+            # Check for PCF control
+            $hasControl = $zip.Entries | Where-Object { $_.FullName -like "*Controls/*" -or $_.FullName -like "*bundle.js*" }
+            if (-not $hasControl) {
+              Write-Warning "PCF control may not be included in package!"
+            }
+          } else {
+            Write-Error "Solution package not found at $zipPath"
+            exit 1
+          }
+      
+      - name: Upload Solution Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: solution-package
+          path: solution/bin/Release/ernaehrungundsportcomponents.zip
+          retention-days: 30
+      
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            solution/bin/**/*.log
+            solution/obj/**/*.log
+          retention-days: 7
+          if-no-files-found: ignore
