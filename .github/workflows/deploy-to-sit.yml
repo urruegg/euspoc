@@ -47,18 +47,12 @@ jobs:
           Write-Host "Environment: ${{ secrets.DATAVERSE_URL_SIT }}" -ForegroundColor Yellow
           Write-Host "Using Service Principal: ${{ secrets.AZURE_CLIENT_ID }}" -ForegroundColor Yellow
           
-          # Get access token from Azure CLI
-          $token = az account get-access-token --resource=https://ernaehrungundsportdev.crm4.dynamics.com/ --query accessToken -o tsv
-          
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to get access token!"
-            exit 1
-          }
-          
-          # Authenticate PAC using the token
+          # Authenticate PAC using GitHub Federation
           pac auth create `
             --environment "${{ secrets.DATAVERSE_URL_SIT }}" `
-            --accessToken $token
+            --githubFederated `
+            --applicationId "${{ secrets.AZURE_CLIENT_ID }}" `
+            --tenant "${{ secrets.AZURE_TENANT_ID }}"
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "PAC authentication failed!"
