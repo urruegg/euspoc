@@ -53,7 +53,7 @@ jobs:
       
       - name: Build Solution Package
         working-directory: solution
-        run: msbuild /p:Configuration=Release /p:Platform="Any CPU" /verbosity:detailed
+        run: msbuild /t:Build,PowerAppsPackage /p:Configuration=Release /p:Platform="Any CPU" /verbosity:detailed
       
       - name: Verify Solution Package
         shell: pwsh
