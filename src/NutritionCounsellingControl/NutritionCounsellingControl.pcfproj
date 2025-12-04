@@ -27,4 +27,15 @@
 
   <Import Project="$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.targets" Condition="Exists('$(PowerAppsTargetsPath)\Microsoft.PowerApps.VisualStudio.Pcf.targets')" />
 
+  <!-- Target required by solution packaging -->
+  <Target Name="GetProjectOutputPath">
+    <PropertyGroup>
+      <ProjectOutputPath>$(OutputPath)\$(Name)</ProjectOutputPath>
+    </PropertyGroup>
+    <ItemGroup>
+      <ProjectOutput Include="$(ProjectOutputPath)\bundle.js" />
+      <ProjectOutput Include="$(ProjectOutputPath)\ControlManifest.xml" />
+    </ItemGroup>
+  </Target>
+
 </Project>
