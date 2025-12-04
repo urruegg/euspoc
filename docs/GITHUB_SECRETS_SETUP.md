@@ -84,7 +84,7 @@ Add the following **Repository Secrets**:
 | `AZURE_CLIENT_ID` | `<appId from step 1>` | Application (client) ID |
 | `AZURE_TENANT_ID` | `9183a0dc-b45d-4487-b246-54d6782d8f33` | Tenant ID (teamruegg.com) |
 | `AZURE_SUBSCRIPTION_ID` | `f25df720-ac20-4b05-bb0c-525bc33a6d40` | Subscription ID |
-| `DATAVERSE_URL_SIT` | `https://<org-sit>.crm4.dynamics.com` | SIT environment URL |
+| `DATAVERSE_URL_SIT` | `https://ernaehrungundsportdev.crm4.dynamics.com` | SIT environment URL |
 
 **Note**: You do NOT need `AZURE_CLIENT_SECRET` when using federated credentials.
 

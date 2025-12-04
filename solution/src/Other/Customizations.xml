@@ -9,7 +9,14 @@
   <EntityRelationships />
   <OrganizationSettings />
   <optionsets />
-  <CustomControls />
+  <CustomControls>
+    <CustomControl formFactor="0" name="EUSPoc.NutritionCounsellingControl" version="1.0.0">
+      <customcontroldescription>Nutrition and Sport Counselling Control</customcontroldescription>
+      <customcontrolresources>
+        <customcontrolresource name="bundle.js" type="0" />
+      </customcontrolresources>
+    </CustomControl>
+  </CustomControls>
   <SolutionPluginAssemblies />
   <EntityDataProviders />
   <Languages>
