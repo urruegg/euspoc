@@ -44,6 +44,25 @@ jobs:
             exit 1
           }
       
+      - name: Copy PCF Control to Solution
+        shell: pwsh
+        run: |
+          Write-Host "=== Copying PCF Control to Solution Structure ===" -ForegroundColor Cyan
+          $source = "out/controls/NutritionCounsellingControl"
+          $dest = "solution/src/Controls/NutritionCounsellingControl"
+          
+          if (Test-Path $dest) {
+            Remove-Item $dest -Recurse -Force
+          }
+          
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item -Path "$source\*" -Destination $dest -Recurse -Force
+          
+          Write-Host "Files copied to solution:" -ForegroundColor Green
+          Get-ChildItem $dest -Recurse | ForEach-Object {
+            Write-Host "  $($_.FullName.Replace((Get-Location).Path + '\', ''))"
+          }
+      
       - name: Setup MSBuild (via Visual Studio)
         uses: microsoft/setup-msbuild@v2
       
