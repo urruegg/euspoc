@@ -47,10 +47,6 @@ jobs:
       - name: Setup MSBuild (via Visual Studio)
         uses: microsoft/setup-msbuild@v2
       
-      - name: Build PCF Project with MSBuild
-        working-directory: src/NutritionCounsellingControl
-        run: msbuild NutritionCounsellingControl.pcfproj /p:Configuration=Release /t:Build
-      
       - name: Restore NuGet Packages
         working-directory: solution
         run: msbuild /t:Restore /p:Configuration=Release
