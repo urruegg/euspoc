@@ -23,6 +23,7 @@ jobs:
       - name: Azure Login (Service Principal)
         uses: azure/login@v2
         with:
+          allow-no-subscriptions: true
           creds: |
             {
               "clientId": "${{ secrets.DATAVERSE_CLIENT_ID_SIT }}",
