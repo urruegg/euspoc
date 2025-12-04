@@ -74,34 +74,22 @@ jobs:
       
       - name: Get Current Solution Version
         id: get_version
+        continue-on-error: true
         shell: pwsh
         run: |
           Write-Host "=== Retrieving Current Solution Version ===" -ForegroundColor Cyan
           
-          $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
-          $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,solutionid"
+          # Use PAC CLI to list solutions
+          $output = pac solution list --environment "${{ secrets.DATAVERSE_URL_SIT }}"
           
-          $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
-          $headers = @{
-            "Authorization" = "Bearer $token"
-            "Content-Type" = "application/json"
-            "OData-MaxVersion" = "4.0"
-            "OData-Version" = "4.0"
-          }
-          
-          try {
-            $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
-            if ($response.value.Count -gt 0) {
-              $currentVersion = $response.value[0].version
-              Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
-              echo "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
-            } else {
-              Write-Host "Solution not found - first deployment" -ForegroundColor Yellow
-              echo "current_version=0.0.0.0" >> $env:GITHUB_OUTPUT
-            }
-          } catch {
-            Write-Warning "Could not retrieve current version: $_"
-            echo "current_version=unknown" >> $env:GITHUB_OUTPUT
+          # Parse the output to find our solution
+          if ($output -match "ernaehrungundsportcomponents\s+(\d+\.\d+\.\d+\.\d+)") {
+            $currentVersion = $matches[1]
+            Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
+            echo "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "Solution not found - first deployment" -ForegroundColor Yellow
+            echo "current_version=0.0.0.0" >> $env:GITHUB_OUTPUT
           }
       
       - name: Import Solution to Dataverse
