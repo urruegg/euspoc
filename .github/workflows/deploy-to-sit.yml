@@ -20,6 +20,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
+      
       - name: Setup Power Platform CLI
         shell: pwsh
         run: |
@@ -29,18 +37,14 @@ jobs:
           Write-Host "`nVerifying PAC CLI installation..." -ForegroundColor Cyan
           pac
       
-      - name: Authenticate to Dataverse (Service Principal)
+      - name: Authenticate to Dataverse
         shell: pwsh
         run: |
           Write-Host "=== Authenticating to Dataverse ===" -ForegroundColor Cyan
           Write-Host "Environment: ${{ secrets.DATAVERSE_URL_SIT }}" -ForegroundColor Yellow
-          Write-Host "Tenant: ${{ secrets.DATAVERSE_TENANT_ID_SIT }}" -ForegroundColor Yellow
           
           pac auth create `
-            --environment "${{ secrets.DATAVERSE_URL_SIT }}" `
-            --applicationId "${{ secrets.DATAVERSE_CLIENT_ID_SIT }}" `
-            --clientSecret "${{ secrets.DATAVERSE_CLIENT_SECRET_SIT }}" `
-            --tenant "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
+            --environment "${{ secrets.DATAVERSE_URL_SIT }}"
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "PAC authentication failed!"
@@ -74,22 +78,34 @@ jobs:
       
       - name: Get Current Solution Version
         id: get_version
-        continue-on-error: true
         shell: pwsh
         run: |
           Write-Host "=== Retrieving Current Solution Version ===" -ForegroundColor Cyan
           
-          # Use PAC CLI to list solutions
-          $output = pac solution list --environment "${{ secrets.DATAVERSE_URL_SIT }}"
+          $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
+          $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,solutionid"
           
-          # Parse the output to find our solution
-          if ($output -match "ernaehrungundsportcomponents\s+(\d+\.\d+\.\d+\.\d+)") {
-            $currentVersion = $matches[1]
-            Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
-            echo "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Host "Solution not found - first deployment" -ForegroundColor Yellow
-            echo "current_version=0.0.0.0" >> $env:GITHUB_OUTPUT
+          $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
+          $headers = @{
+            "Authorization" = "Bearer $token"
+            "Content-Type" = "application/json"
+            "OData-MaxVersion" = "4.0"
+            "OData-Version" = "4.0"
+          }
+          
+          try {
+            $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
+            if ($response.value.Count -gt 0) {
+              $currentVersion = $response.value[0].version
+              Write-Host "Current version: $currentVersion" -ForegroundColor Yellow
+              echo "current_version=$currentVersion" >> $env:GITHUB_OUTPUT
+            } else {
+              Write-Host "Solution not found - first deployment" -ForegroundColor Yellow
+              echo "current_version=0.0.0.0" >> $env:GITHUB_OUTPUT
+            }
+          } catch {
+            Write-Warning "Could not retrieve current version: $_"
+            echo "current_version=unknown" >> $env:GITHUB_OUTPUT
           }
       
       - name: Import Solution to Dataverse
