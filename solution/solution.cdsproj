@@ -47,7 +47,11 @@
   </ItemGroup>
   
   <ItemGroup>
-    <ProjectReference Include="..\src\NutritionCounsellingControl\NutritionCounsellingControl.pcfproj" />
+    <ProjectReference Include="..\src\NutritionCounsellingControl\NutritionCounsellingControl.pcfproj">
+      <Project>{3F2504E0-4F89-41D3-9A0C-0305E82C3301}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <IncludeOutputInPack>true</IncludeOutputInPack>
+    </ProjectReference>
   </ItemGroup>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
