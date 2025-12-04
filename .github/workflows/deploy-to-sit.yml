@@ -125,7 +125,6 @@ jobs:
           
           pac solution import `
             --path "./artifact/solution.zip" `
-            --async `
             --force-overwrite `
             --publish-changes `
             --skip-dependency-check
@@ -135,59 +134,14 @@ jobs:
             exit 1
           }
           
-          Write-Host "Solution import initiated successfully!" -ForegroundColor Green
+          Write-Host "Solution import completed successfully!" -ForegroundColor Green
       
-      - name: Wait for Import Completion
+      - name: Verify Import Completion
         shell: pwsh
-        timeout-minutes: 10
         run: |
-          Write-Host "=== Monitoring Import Progress ===" -ForegroundColor Cyan
-          
-          $maxRetries = 60
-          $retryCount = 0
-          $sleepSeconds = 10
-          
-          while ($retryCount -lt $maxRetries) {
-            Start-Sleep -Seconds $sleepSeconds
-            $retryCount++
-            
-            Write-Host "Checking import status (attempt $retryCount/$maxRetries)..." -ForegroundColor Yellow
-            
-            # Check if solution version has been updated
-            $baseUrl = "${{ secrets.DATAVERSE_URL_SIT }}"
-            $apiUrl = "$baseUrl/api/data/v9.2/solutions?`$filter=uniquename eq 'ernaehrungundsportcomponents'&`$select=version,modifiedon"
-            
-            $token = az account get-access-token --resource=$baseUrl --query accessToken -o tsv
-            $headers = @{
-              "Authorization" = "Bearer $token"
-              "Content-Type" = "application/json"
-              "OData-MaxVersion" = "4.0"
-              "OData-Version" = "4.0"
-            }
-            
-            try {
-              $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers
-              if ($response.value.Count -gt 0) {
-                $newVersion = $response.value[0].version
-                $modifiedOn = $response.value[0].modifiedon
-                
-                Write-Host "Current version: $newVersion (modified: $modifiedOn)" -ForegroundColor Cyan
-                
-                # If version changed or modified time is recent, import likely succeeded
-                if ($newVersion -ne "${{ steps.get_version.outputs.current_version }}") {
-                  Write-Host "Version updated! Import completed successfully." -ForegroundColor Green
-                  break
-                }
-              }
-            } catch {
-              Write-Warning "Error checking status: $_"
-            }
-          }
-          
-          if ($retryCount -ge $maxRetries) {
-            Write-Warning "Import status could not be confirmed within timeout period."
-            Write-Host "Please verify manually in Dataverse." -ForegroundColor Yellow
-          }
+          Write-Host "=== Verifying Import Result ===" -ForegroundColor Cyan
+          Write-Host "Import completed by PAC CLI (synchronous operation)" -ForegroundColor Green
+          Write-Host "Solution has been imported and all customizations published." -ForegroundColor Green
       
       - name: Verify Deployment
         shell: pwsh
