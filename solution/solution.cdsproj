@@ -51,6 +51,7 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+      <BuildReference>false</BuildReference>
     </ProjectReference>
   </ItemGroup>
 
