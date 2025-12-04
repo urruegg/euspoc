@@ -20,39 +20,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Azure Login (Service Principal)
-        uses: azure/login@v2
-        with:
-          allow-no-subscriptions: true
-          creds: |
-            {
-              "clientId": "${{ secrets.DATAVERSE_CLIENT_ID_SIT }}",
-              "clientSecret": "${{ secrets.DATAVERSE_CLIENT_SECRET_SIT }}",
-              "tenantId": "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
-            }
-      
-      - name: Verify Azure Authentication
+      - name: Setup Power Platform CLI
         shell: pwsh
         run: |
-          Write-Host "=== Azure Authentication Status ===" -ForegroundColor Cyan
-          $account = az account show --query "[name, user.name, tenantId]" -o tsv
-          Write-Host "Account: $account" -ForegroundColor Green
-          
-          $tenantId = az account show --query tenantId -o tsv
-          $expectedTenant = "${{ secrets.DATAVERSE_TENANT_ID_SIT }}"
-          
-          if ($tenantId -ne $expectedTenant) {
-            Write-Error "Tenant mismatch! Expected: $expectedTenant, Got: $tenantId"
-            exit 1
-          }
-      
-      - name: Setup Power Platform CLI
-        uses: microsoft/powerplatform-actions/actions-install@v1
+          Write-Host "Installing Power Platform CLI..." -ForegroundColor Cyan
+          dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+          pac install latest
       
       - name: Authenticate to Dataverse (Service Principal)
         shell: pwsh
         run: |
           Write-Host "=== Authenticating to Dataverse ===" -ForegroundColor Cyan
+          Write-Host "Environment: ${{ secrets.DATAVERSE_URL_SIT }}" -ForegroundColor Yellow
+          Write-Host "Tenant: ${{ secrets.DATAVERSE_TENANT_ID_SIT }}" -ForegroundColor Yellow
           
           pac auth create `
             --environment "${{ secrets.DATAVERSE_URL_SIT }}" `
@@ -79,7 +59,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Solution Package Verification ===" -ForegroundColor Cyan
-          $zipPath = "./artifact/ernaehrungundsportcomponents.zip"
+          $zipPath = "./artifact/solution.zip"
           
           if (Test-Path $zipPath) {
             $zipSize = (Get-Item $zipPath).Length
@@ -130,7 +110,7 @@ jobs:
           Write-Host "Current Version: ${{ steps.get_version.outputs.current_version }}" -ForegroundColor Cyan
           
           pac solution import `
-            --path "./artifact/ernaehrungundsportcomponents.zip" `
+            --path "./artifact/solution.zip" `
             --async `
             --force-overwrite `
             --publish-changes `
