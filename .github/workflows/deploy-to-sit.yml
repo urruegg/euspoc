@@ -25,7 +25,9 @@ jobs:
         run: |
           Write-Host "Installing Power Platform CLI..." -ForegroundColor Cyan
           dotnet tool install --global Microsoft.PowerApps.CLI.Tool
-          pac install latest
+          
+          Write-Host "`nVerifying PAC CLI installation..." -ForegroundColor Cyan
+          pac
       
       - name: Authenticate to Dataverse (Service Principal)
         shell: pwsh
