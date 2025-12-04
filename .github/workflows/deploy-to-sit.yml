@@ -45,9 +45,20 @@ jobs:
         run: |
           Write-Host "=== Authenticating to Dataverse ===" -ForegroundColor Cyan
           Write-Host "Environment: ${{ secrets.DATAVERSE_URL_SIT }}" -ForegroundColor Yellow
+          Write-Host "Using Service Principal: ${{ secrets.AZURE_CLIENT_ID }}" -ForegroundColor Yellow
           
+          # Get access token from Azure CLI
+          $token = az account get-access-token --resource=https://ernaehrungundsportdev.crm4.dynamics.com/ --query accessToken -o tsv
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to get access token!"
+            exit 1
+          }
+          
+          # Authenticate PAC using the token
           pac auth create `
-            --environment "${{ secrets.DATAVERSE_URL_SIT }}"
+            --environment "${{ secrets.DATAVERSE_URL_SIT }}" `
+            --accessToken $token
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "PAC authentication failed!"
