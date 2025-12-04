@@ -60,7 +60,7 @@ jobs:
         working-directory: solution
         run: |
           Write-Host "=== Solution Package Contents ===" -ForegroundColor Cyan
-          $zipPath = "bin/Release/ernaehrungundsportcomponents.zip"
+          $zipPath = "bin/Any CPU/Release/solution.zip"
           
           if (Test-Path $zipPath) {
             $zipSize = (Get-Item $zipPath).Length
@@ -91,7 +91,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: solution-package
-          path: solution/bin/Release/ernaehrungundsportcomponents.zip
+          path: solution/bin/Any CPU/Release/solution.zip
           retention-days: 30
       
       - name: Upload Build Logs
